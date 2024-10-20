@@ -72,7 +72,6 @@ wrapper {
     gradleVersion = '8.8'
 }
 
-
 publishing {
     publications {
         mavenJava(MavenPublication) {
@@ -118,10 +117,5 @@ publishing {
 }
 
 signing {
-    useInMemoryPgpKeys(
-            project.hasProperty("signingKeyId") ? project.properties["signingKeyId"] : System.getenv('signingKeyId'),
-            project.hasProperty("signingKey") ? project.properties["signingKey"] : System.getenv('signingKey'),
-            project.hasProperty("signingPassword") ? project.properties["signingPassword"] : System.getenv('signingPassword')
-    )
     sign publishing.publications.mavenJava
 }
