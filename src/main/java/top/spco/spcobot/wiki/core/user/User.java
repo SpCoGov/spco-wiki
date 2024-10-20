@@ -22,7 +22,6 @@ public class User extends WikiBase implements UserAction {
 
     public User(Wiki wiki, String name) {
         super(wiki);
-        this.wiki = wiki;
         this.name = name;
     }
 

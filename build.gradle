@@ -80,7 +80,7 @@ publishing {
 
             pom {
                 name = 'SpCoBot-Wiki'
-                description = 'A library for effortlessly interacting with Wikipedia/MediaWiki'
+                description = 'A library for easily interacting with MediaWiki-based wikis'
                 inceptionYear = '2024'
                 url = 'https://github.com/SpCoGov/SpCoBot-WiKi'
                 licenses {
@@ -118,5 +118,10 @@ publishing {
 }
 
 signing {
+    useInMemoryPgpKeys(
+            project.hasProperty("signingKeyId") ? project.properties["signingKeyId"] : System.getenv('signingKeyId'),
+            project.hasProperty("signingKey") ? project.properties["signingKey"] : System.getenv('signingKey'),
+            project.hasProperty("signingPassword") ? project.properties["signingPassword"] : System.getenv('signingPassword')
+    )
     sign publishing.publications.mavenJava
 }
