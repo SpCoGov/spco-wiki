@@ -1,0 +1,122 @@
+plugins {
+    id 'idea'
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+}
+
+description = "${project.name} build script"
+group = "top.spco.spcobot.wiki"
+version = "0.1.0"
+
+repositories {
+    mavenCentral()
+}
+
+allprojects {
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+    }
+}
+
+dependencies {
+    api "com.google.code.gson:gson:2.10.1"
+    api "com.squareup.okhttp3:okhttp:4.12.0"
+    api "com.squareup.okhttp3:okhttp-urlconnection:4.11.0"
+    implementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.+'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.+'
+
+    implementation group: 'com.google.guava', name: 'guava', version: '33.2.1-jre'
+    implementation group: 'commons-codec', name: 'commons-codec', version: '1.17.1'
+    implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '4.28.2'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.20.0'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.20.0'
+    implementation group: 'org.apache.logging.log4j', name: 'log4j-slf4j2-impl', version: '2.20.0'
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.7'
+}
+
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+
+    withJavadocJar()
+    withSourcesJar()
+}
+
+
+javadoc {
+    source = sourceSets.main.allJava
+    classpath = configurations.compileClasspath
+    options.addStringOption('Xdoclint:none', '-quiet')
+    failOnError = false
+    options {
+        jFlags '-Dhttp.agent=gradle-javadoc'
+        setMemberLevel JavadocMemberLevel.PUBLIC
+        setAuthor true
+
+        links "https://docs.oracle.com/en/java/javase/21/docs/api/"
+        links "https://www.javadoc.io/doc/com.google.code.gson/gson/2.10.1/"
+    }
+}
+
+wrapper {
+    gradleVersion = '8.8'
+}
+
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            pom {
+                name = 'SpCoBot-Wiki'
+                description = 'A library for effortlessly interacting with Wikipedia/MediaWiki'
+                inceptionYear = '2024'
+                url = 'https://github.com/SpCoGov/SpCoBot-WiKi'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'spongecouna'
+                        name = 'SpCo'
+                        email = 'haimiancouna@gmail.com'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/SpCoGov/SpCoBot-Wiki.git'
+                    developerConnection = 'scm:git:ssh://github.com/SpCoGov/SpCoBot-Wiki.git'
+                    url = 'https://github.com/SpCoGov/SpCoBot-WiKi'
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+
+            credentials {
+                username project.hasProperty("ossrhUsername") ? project.properties["ossrhUsername"] : System.getenv('ossrhUsername')
+                password project.hasProperty("ossrhPassword") ? project.properties["ossrhPassword"] : System.getenv('ossrhPassword')
+            }
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}
