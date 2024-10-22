@@ -77,6 +77,8 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
 
+            artifact(source: file('build/libs/pom.xml'), extension: 'pom')
+
             pom {
                 name = 'spco-wiki'
                 description = 'A library for easily interacting with MediaWiki-based wikis.'
@@ -90,7 +92,7 @@ publishing {
                 }
                 developers {
                     developer {
-                         id = 'spongecouna'
+                        id = 'spongecouna'
                         name = 'SpCo'
                         email = 'haimiancouna@gmail.com'
                     }
@@ -98,7 +100,7 @@ publishing {
                 scm {
                     connection = 'scm:git:https://github.com/SpCoGov/spco-wiki.git'
                     developerConnection = 'scm:git:ssh://github.com/SpCoGov/spco-wiki.git'
-                    url = 'https://github.com/SpCoGov/spco-wiki '
+                    url = 'https://github.com/SpCoGov/spco-wiki'
                 }
             }
         }
