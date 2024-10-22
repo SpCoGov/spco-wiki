@@ -78,10 +78,10 @@ publishing {
             from components.java
 
             pom {
-                name = 'SpCoBot-Wiki'
-                description = 'A library for easily interacting with MediaWiki-based wikis'
+                name = 'spco-wiki'
+                description = 'A library for easily interacting with MediaWiki-based wikis.'
                 inceptionYear = '2024'
-                url = 'https://github.com/SpCoGov/SpCoBot-WiKi'
+                url = 'https://github.com/SpCoGov/spco-wiki'
                 licenses {
                     license {
                         name = 'The Apache License, Version 2.0'
@@ -90,15 +90,15 @@ publishing {
                 }
                 developers {
                     developer {
-                        id = 'spongecouna'
+                         id = 'spongecouna'
                         name = 'SpCo'
                         email = 'haimiancouna@gmail.com'
                     }
                 }
                 scm {
-                    connection = 'scm:git:https://github.com/SpCoGov/SpCoBot-Wiki.git'
-                    developerConnection = 'scm:git:ssh://github.com/SpCoGov/SpCoBot-Wiki.git'
-                    url = 'https://github.com/SpCoGov/SpCoBot-WiKi'
+                    connection = 'scm:git:https://github.com/SpCoGov/spco-wiki.git'
+                    developerConnection = 'scm:git:ssh://github.com/SpCoGov/spco-wiki.git'
+                    url = 'https://github.com/SpCoGov/spco-wiki '
                 }
             }
         }
