@@ -600,6 +600,28 @@ public final class Wiki implements UserAction {
     }
 
     /**
+     * 巡查最近更改。
+     *
+     * @param id 要巡查的最近更改
+     * @return 巡查是否成功
+     * @since 0.1.1
+     */
+    public boolean patrolRecentChange(int id) {
+        return patrol(id, null);
+    }
+
+    /**
+     * 巡查修订版本。
+     *
+     * @param id 要巡查的修订版本
+     * @return 巡查是否成功
+     * @since 0.1.1
+     */
+    public boolean patrolRevision(int id) {
+        return patrol(null, id);
+    }
+
+    /**
      * 封禁一位用户，需要 {@link UserRight#BLOCK} 权限。
      *
      * @param user                   要封禁的用户。通过 用户名、IP、IP范围和用户ID(例如“#12345”) 中任意一种方式指定的用户
