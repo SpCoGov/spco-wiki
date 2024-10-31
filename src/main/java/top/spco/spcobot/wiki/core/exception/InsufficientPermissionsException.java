@@ -39,15 +39,27 @@ public class InsufficientPermissionsException extends RuntimeException {
      * 创建一个带有自定义消息和所缺少权限的权限不足异常。
      *
      * @param action            自定义行为
+     * @param allNeeded         是否需要所有的权限
+     * @param missingPermission 所缺少的权限
+     * @since 0.1.0
+     */
+    public InsufficientPermissionsException(String action, boolean allNeeded, UserRight... missingPermission) {
+        super("Insufficient permissions to " + action +
+                ". Missing permissions: " + formatPermissions(allNeeded, missingPermission) + ".");
+    }
+
+    /**
+     * 创建一个带有自定义消息和所缺少权限的权限不足异常。
+     *
+     * @param action            自定义行为
      * @param missingPermission 所缺少的权限
      * @since 0.1.0
      */
     public InsufficientPermissionsException(String action, UserRight... missingPermission) {
-        super("Insufficient permissions to " + action +
-                ". Missing permissions: " + formatPermissions(missingPermission) + ".");
+        this(action, true, missingPermission);
     }
 
-    private static String formatPermissions(UserRight[] missingPermission) {
+    private static String formatPermissions(boolean allNeeded, UserRight[] missingPermission) {
         List<String> permissionsList = Arrays.stream(missingPermission)
                 .map(UserRight::toString)
                 .collect(Collectors.toList());
@@ -55,8 +67,11 @@ public class InsufficientPermissionsException extends RuntimeException {
         if (permissionsList.size() == 1) {
             return permissionsList.getFirst();
         } else {
-            return String.join(", ", permissionsList.subList(0, permissionsList.size() - 1)) +
-                    " and " + permissionsList.getLast();
+            if (allNeeded) {
+                return String.join(", ", permissionsList.subList(0, permissionsList.size() - 1)) +
+                        " and " + permissionsList.getLast();
+            }
+            return String.join(" or ", permissionsList);
         }
     }
 }

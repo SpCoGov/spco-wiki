@@ -50,7 +50,7 @@ import static top.spco.spcobot.wiki.core.util.MapUtil.paramsMap;
  * Wiki实例。
  *
  * @author SpCo
- * @version 0.1.0
+ * @version 0.1.1
  * @since 0.1.0
  */
 @SuppressWarnings("unused")
@@ -65,7 +65,7 @@ public final class Wiki implements UserAction {
     private final HashMap<String, String> basicRequestParams = paramsMap("format", "json");
     private String csrfToken;
     private String patrolToken;
-    private Supplier<String> otpSupplier;
+    private final Supplier<String> otpSupplier;
     private int normalApiLimit = 50;
     private int higherApiLimit = 500;
 
@@ -399,19 +399,83 @@ public final class Wiki implements UserAction {
         return supportedLanguages;
     }
 
-    private void checkPermission(Set<String> rights, String action, boolean condition, UserRight... requiredRight) {
+    /**
+     * 检查是否拥有所有所需权限。
+     *
+     * @param rights        所拥有的权限
+     * @param action        检查权限的操作，用于抛出异常
+     * @param condition     检查权限的条件
+     * @param requiredRight 所需要的权限
+     * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @since 0.1.1
+     */
+    public void checkPermission(Set<String> rights, String action, boolean condition, UserRight... requiredRight) {
+        checkPermission(rights, action, condition, true, requiredRight);
+    }
+
+    /**
+     * 检查是否拥有所需权限。
+     *
+     * @param rights        所拥有的权限
+     * @param action        检查权限的操作，用于抛出异常
+     * @param condition     检查权限的条件
+     * @param allNeeded     是否需要所有权限，为 {@code false} 时只需其中一项
+     * @param requiredRight 所需要的权限
+     * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @since 0.1.1
+     */
+    public void checkPermission(Set<String> rights, String action, boolean condition, boolean allNeeded, UserRight... requiredRight) {
         ArrayList<UserRight> missing = new ArrayList<>();
         for (UserRight right : requiredRight) {
             if (!rights.contains(right.toString())) {
                 missing.add(right);
+            } else {
+                if (!allNeeded) {
+                    return;
+                }
             }
         }
         if (condition && !missing.isEmpty()) {
-            throw new InsufficientPermissionsException(action, missing.toArray(new UserRight[0]));
+            throw new InsufficientPermissionsException(action, allNeeded, missing.toArray(new UserRight[0]));
         }
     }
 
-    private Set<String> getRightSet() {
+    /**
+     * 获取所拥有的权限并检查是否拥有所有所需权限。<p>
+     * 需要多次检查权限时建议使用 {@link #getRightsName()} 配合 {@link #checkPermission(Set, String, boolean, boolean, UserRight...)} 。
+     *
+     * @param action        检查权限的操作，用于抛出异常
+     * @param condition     检查权限的条件
+     * @param allNeeded     是否需要所有权限，为 {@code false} 时只需其中一项
+     * @param requiredRight 所需要的权限
+     * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @since 0.1.1
+     */
+    public void checkPermission(String action, boolean condition, boolean allNeeded, UserRight... requiredRight) {
+        checkPermission(getRightsName(), action, condition, allNeeded, requiredRight);
+    }
+
+    /**
+     * 获取所拥有的权限并检查是否拥有所需权限。<p>
+     * 需要多次检查权限时建议使用 {@link #getRightsName()} 配合 {@link #checkPermission(Set, String, boolean, UserRight...)} 。
+     *
+     * @param action        检查权限的操作，用于抛出异常
+     * @param condition     检查权限的条件
+     * @param requiredRight 所需要的权限
+     * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @since 0.1.1
+     */
+    public void checkPermission(String action, boolean condition, UserRight... requiredRight) {
+        checkPermission(action, condition, false, requiredRight);
+    }
+
+    /**
+     * 获取所有权限名。
+     *
+     * @return 所拥有的所有权限名
+     * @since 0.1.1
+     */
+    public Set<String> getRightsName() {
         Set<String> rights = new HashSet<>();
         for (JsonElement e : userInfo().get("rights").getAsJsonArray()) {
             rights.add(e.getAsString());
@@ -498,12 +562,12 @@ public final class Wiki implements UserAction {
         }
     }
 
-    private boolean patrol(RecentChange recentChange, Revision revision) {
+    private boolean patrol(Integer recentChangeId, Integer revisionId) {
         Map<String, String> paramsMap = new HashMap<>();
-        if (recentChange != null) {
-            paramsMap.put("rcid", recentChange.id() + "");
+        if (recentChangeId != null) {
+            paramsMap.put("rcid", recentChangeId + "");
         } else {
-            paramsMap.put("revid", revision.id() + "");
+            paramsMap.put("revid", revisionId + "");
         }
         try (Response response = post(ActionTypes.PATROL, paramsMap)) {
             String body = checkAndGetBody(response, "patrol");
@@ -521,7 +585,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public boolean patrol(Revision revision) {
-        return patrol(null, revision);
+        return patrol(null, revision.id());
     }
 
     /**
@@ -532,7 +596,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public boolean patrol(RecentChange recentChange) {
-        return patrol(recentChange, null);
+        return patrol(recentChange.id(), null);
     }
 
     /**
@@ -554,7 +618,7 @@ public final class Wiki implements UserAction {
     public void block(String user, Expiry expiry, String reason, boolean annoOnly, boolean noCreate,
                       boolean allowUserTalk, boolean reblock,
                       boolean watchUser, boolean partial, String[] pageRestrictions, NameSpace... nameSpacesRestrictions) {
-        Set<String> rights = getRightSet();
+        Set<String> rights = getRightsName();
         checkPermission(rights, "block user", true, UserRight.BLOCK);
         Map<String, String> params = paramsMap("user", user, "expiry", expiry.toString());
         if (reason != null && !reason.isEmpty()) {
@@ -619,7 +683,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public void unblock(String user, String reason, boolean watchUser) {
-        Set<String> rights = getRightSet();
+        Set<String> rights = getRightsName();
         checkPermission(rights, "unblock user", true, UserRight.BLOCK);
         Map<String, String> params = paramsMap("user", user);
         if (reason != null && !reason.isEmpty()) {
@@ -938,6 +1002,19 @@ public final class Wiki implements UserAction {
     }
 
     /**
+     * 列举所有命名空间中的最近更改。
+     *
+     * @param start 枚举的起始{@link Timestamp 时间戳}，为 {@code null} 时忽略
+     * @param end   结束枚举的时间戳，为 {@code null} 时忽略
+     * @param show  只显示满足这些标准的项目
+     * @return 列举的最近更改
+     * @since 0.1.1
+     */
+    public HashSet<RecentChange> recentChanges(Timestamp start, Timestamp end, RevisionType... show) {
+        return recentChanges(start, end, show, NameSpace.ALL);
+    }
+
+    /**
      * 列举最近更改。
      *
      * @param start      枚举的起始{@link Timestamp 时间戳}，为 {@code null} 时忽略
@@ -953,7 +1030,11 @@ public final class Wiki implements UserAction {
         if (show != null && show.length > 0) {
             StringBuilder rcshowBuilder = new StringBuilder();
             for (int i = 0; i < show.length; i++) {
-                rcshowBuilder.append(show[i].getValue());
+                RevisionType type = show[i];
+                if (type == RevisionType.NOT_PATROLLED || type == RevisionType.PATROLLED || type == RevisionType.UNPATROLLED) {
+                    checkPermission("get recent changes", true, false, UserRight.PATROLMARKS, UserRight.PATROL);
+                }
+                rcshowBuilder.append(type.getValue());
                 if (i != show.length - 1) {
                     rcshowBuilder.append("|");
                 }
@@ -970,7 +1051,7 @@ public final class Wiki implements UserAction {
             baseParam.put("rcnamespace", NameSpace.toApiParam(true, nameSpaces));
         }
         continuableAction(ActionTypes.RECENT_CHANGES, baseParam, "get recent changes", (jsonObject -> {
-            JsonArray rcsJson = JsonUtil.checkAndGetElement(jsonObject, "query", "recentchanges").getAsJsonArray();
+            JsonArray rcsJson = JsonUtil.checkAndGetNonNullElement(jsonObject, "query", "recentchanges").getAsJsonArray();
             for (JsonElement rcJson : rcsJson) {
                 recentChanges.add(RecentChange.fromJson(rcJson.getAsJsonObject()));
             }
@@ -1042,7 +1123,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public HashSet<AbuseFilterLogEntry> abuseLogs(Integer logId, String user, String title, Timestamp start, Timestamp end, AbuseFilter... filters) {
-        Set<String> rights = getRightSet();
+        Set<String> rights = getRightsName();
         checkPermission(rights, "get abuse logs", true, UserRight.ABUSEFILTER_LOG);
         checkPermission(rights, "get private abuse logs", AbuseFilter.hasPrivateFilter(filters), UserRight.ABUSEFILTER_LOG_PRIVATE);
         checkPermission(rights, "get details of abuse logs", true, UserRight.ABUSEFILTER_LOG_DETAIL);
@@ -1091,7 +1172,7 @@ public final class Wiki implements UserAction {
      * @return 过滤器简化的的捕获事件
      */
     public HashSet<SimplifiedAbuseFilterLogEntry> simplifiedAbuseLogs(Timestamp start, Timestamp end) {
-        Set<String> rights = getRightSet();
+        Set<String> rights = getRightsName();
         checkPermission(rights, "get abuse logs", true, UserRight.ABUSEFILTER_LOG);
         HashSet<SimplifiedAbuseFilterLogEntry> result = new HashSet<>();
         HashMap<String, String> baseParam = paramsMap("afllimit", "max", "aflprop", "user|title|action|result|filter|timestamp");
