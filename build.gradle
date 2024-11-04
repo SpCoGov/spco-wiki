@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 plugins {
     id 'idea'
     id 'java-library'
@@ -104,18 +106,6 @@ publishing {
         }
     }
 
-    afterEvaluate {
-        publishing.publications.mavenJava.artifacts.each {
-            artifact ->
-                ['md5', 'sha1'].each { algo ->
-                    File file = new File(artifact.file.parentFile, "${artifact.file.name}.${algo}")
-                    if (!file.exists()) {
-                        file.text = artifact.file.bytes.digest(algo)
-                    }
-                }
-        }
-    }
-
     repositories {
         maven {
             url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
@@ -123,6 +113,25 @@ publishing {
             credentials {
                 username project.hasProperty("ossrhUsername") ? project.properties["ossrhUsername"] : System.getenv('ossrhUsername')
                 password project.hasProperty("ossrhPassword") ? project.properties["ossrhPassword"] : System.getenv('ossrhPassword')
+            }
+        }
+    }
+}
+
+tasks.withType(Jar).configureEach { jarTask ->
+    jarTask.doLast {
+        def calculateHash = { file, algo ->
+            MessageDigest digest = MessageDigest.getInstance(algo)
+            file.withInputStream { fis ->
+                digest.update(fis.bytes)
+            }
+            digest.digest().collect { String.format("%02x", it) }.join()
+        }
+
+        ['MD5', 'SHA1'].each { algo ->
+            File hashFile = new File(jarTask.archiveFile.get().asFile.parentFile, "${jarTask.archiveFileName.get()}.${algo.toLowerCase()}")
+            if (!hashFile.exists()) {
+                hashFile.text = calculateHash(jarTask.archiveFile.get().asFile, algo)
             }
         }
     }

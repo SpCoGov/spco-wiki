@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
  * 当用户尝试执行他们没有权限进行的操作时，抛出该异常。
  *
  * @author SpCo
- * @version 0.1.0
+ * @version 0.1.1
  * @since 0.1.0
  */
 public class InsufficientPermissionsException extends RuntimeException {
@@ -41,7 +41,7 @@ public class InsufficientPermissionsException extends RuntimeException {
      * @param action            自定义行为
      * @param allNeeded         是否需要所有的权限
      * @param missingPermission 所缺少的权限
-     * @since 0.1.0
+     * @since 0.1.1
      */
     public InsufficientPermissionsException(String action, boolean allNeeded, UserRight... missingPermission) {
         super("Insufficient permissions to " + action +
@@ -53,7 +53,7 @@ public class InsufficientPermissionsException extends RuntimeException {
      *
      * @param action            自定义行为
      * @param missingPermission 所缺少的权限
-     * @since 0.1.0
+     * @since 0.1.1
      */
     public InsufficientPermissionsException(String action, UserRight... missingPermission) {
         this(action, true, missingPermission);
