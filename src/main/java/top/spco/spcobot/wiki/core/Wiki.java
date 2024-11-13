@@ -50,10 +50,10 @@ import static top.spco.spcobot.wiki.core.util.MapUtil.paramsMap;
  * Wiki实例。
  *
  * @author SpCo
- * @version 0.1.1
+ * @version 0.1.2
  * @since 0.1.0
  */
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused"})
 public final class Wiki implements UserAction {
     private final static Logger LOGGER = LogUtil.getLogger();
     private final OkHttpClient client;
@@ -732,6 +732,60 @@ public final class Wiki implements UserAction {
     }
 
     /**
+     * 获取第一个修订版本到第二个修订版本之间的差异。<br>
+     * 该方法接受来自两个页面的标题或修订版本 ID并返回差异结果。每组中的变量（标题组和修订 ID 组）必须有且仅有一个有效的变量。
+     * 如果不满足这一条件，将抛出 {@link IllegalArgumentException} 异常。
+     *
+     * @param fromTitle      要比较的第一个标题
+     * @param toTitle        要比较的第二个标题
+     * @param fromRevisionId 要比较的第一个修订版本
+     * @param toRevisionId   要比较的第二个修订版本
+     * @param diffType       返回格式化为行内HTML的比较结果，为 {@code null} 时默认为 {@link DiffType#TABLE}
+     * @return 两修订版本之间的差异
+     * @throws IllegalArgumentException 如果每组中的有效变量不符合条件（每组有且仅有一个有效变量），抛出此异常
+     * @since 0.1.2
+     */
+    public DifferentComparison compare(String fromTitle, String toTitle, Integer fromRevisionId, Integer toRevisionId, DiffType diffType) {
+        Map<String, String> params = new HashMap<>();
+        if (!exactlyOneValid(fromTitle, fromRevisionId) || !exactlyOneValid(toTitle, toRevisionId)) {
+            throw new IllegalArgumentException("There must be only one valid variable in each group.");
+        }
+        if (isValid(fromTitle)) {
+            params.put("fromtitle", fromTitle);
+        }
+        if (isValid(toTitle)) {
+            params.put("totitle", toTitle);
+        }
+        if (isValid(fromRevisionId)) {
+            params.put("fromrev", fromRevisionId + "");
+        }
+        if (isValid(toRevisionId)) {
+            params.put("torev", toRevisionId + "");
+        }
+        if (diffType != null) {
+            params.put("difftype", diffType.toString());
+        }
+        try (Response response = post(ActionTypes.COMPARE, params)) {
+            String body = checkAndGetBody(response, "compare pages");
+            return DifferentComparison.fromJson(JsonUtil.checkAndGetNonNullElement(body, "compare").getAsJsonObject());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to compare pages: " + e.getMessage(), e);
+        }
+    }
+
+    private static boolean exactlyOneValid(String a, Integer b) {
+        return isValid(a) ^ isValid(b);
+    }
+
+    private static boolean isValid(String value) {
+        return value != null && !value.isEmpty();
+    }
+
+    private static boolean isValid(Integer value) {
+        return value != null && value > 0;
+    }
+
+    /**
      * 获取滥用过滤器。
      *
      * @param id 过滤器的ID
@@ -1048,7 +1102,7 @@ public final class Wiki implements UserAction {
      */
     public HashSet<RecentChange> recentChanges(Timestamp start, Timestamp end, RevisionType[] show, NameSpace... nameSpaces) {
         HashSet<RecentChange> recentChanges = new HashSet<>();
-        Map<String, String> baseParam = paramsMap("rclimit", "max");
+        Map<String, String> baseParam = paramsMap("rclimit", "max", "rcprop", "user|comment|timestamp|title|ids");
         if (show != null && show.length > 0) {
             StringBuilder rcshowBuilder = new StringBuilder();
             for (int i = 0; i < show.length; i++) {

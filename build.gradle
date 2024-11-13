@@ -9,7 +9,7 @@ plugins {
 
 description = "${project.name} build script"
 group = "top.spco.spcobot.wiki"
-version = "0.1.1"
+version = "0.1.2"
 
 repositories {
     mavenCentral()
