@@ -1,7 +1,7 @@
 package top.spco.spcobot.wiki.core;
 
 import top.spco.spcobot.wiki.core.action.parameter.Expiry;
-import top.spco.spcobot.wiki.core.action.parameter.FilterDir;
+import top.spco.spcobot.wiki.core.action.parameter.FilterRedirect;
 import top.spco.spcobot.wiki.core.action.parameter.RevisionType;
 import top.spco.spcobot.wiki.core.action.parameter.Timestamp;
 import top.spco.spcobot.wiki.core.util.CollectionUtil;
@@ -295,7 +295,7 @@ public final class NameSpace {
      * 此对象仅在部分Api的参数重表示请求所有命名空间。
      *
      * @see Wiki#allRevisions(String, Timestamp, Timestamp, NameSpace...)
-     * @see Wiki#linksHere(String, FilterDir, NameSpace...)
+     * @see Wiki#linksHere(String, FilterRedirect, NameSpace...)
      * @see Wiki#recentChanges(Timestamp, Timestamp, RevisionType[], NameSpace...)
      * @see Wiki#block(String, Expiry, String, boolean, boolean, boolean, boolean, boolean, boolean, String[], NameSpace...)
      * @since 0.1.0
@@ -308,7 +308,9 @@ public final class NameSpace {
 
     private NameSpace(int value) {
         this.value = value;
-        mapping.put(value, this);
+        if (value >= 0) {
+            mapping.put(value, this);
+        }
     }
 
     public static NameSpace from(int value) {

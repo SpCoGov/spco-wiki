@@ -17,7 +17,7 @@ package top.spco.spcobot.wiki.task;
 
 import top.spco.spcobot.wiki.core.NameSpace;
 import top.spco.spcobot.wiki.core.Page;
-import top.spco.spcobot.wiki.core.action.parameter.FilterDir;
+import top.spco.spcobot.wiki.core.action.parameter.FilterRedirect;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +39,7 @@ public class ForeachPageMultithreadedTask extends MultithreadedTask<ForeachPageM
     public void run() {
         if (targets == null) {
             ArrayList<String> pages = new ArrayList<>();
-            for (Page page : getWiki().allPages("", FilterDir.ALL, NameSpace.allNameSpaces())) {
+            for (Page page : getWiki().allPages("", FilterRedirect.ALL, NameSpace.allNameSpaces())) {
                 pages.add(page.title());
             }
             targets = pages;

@@ -20,14 +20,17 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import okhttp3.*;
 import org.apache.logging.log4j.Logger;
+import top.spco.spcobot.wiki.core.action.ActionType;
 import top.spco.spcobot.wiki.core.action.ActionTypes;
+import top.spco.spcobot.wiki.core.action.PermissionChecker;
 import top.spco.spcobot.wiki.core.action.filter.AbuseFilter;
 import top.spco.spcobot.wiki.core.action.filter.AbuseFilterLogEntry;
 import top.spco.spcobot.wiki.core.action.filter.SimplifiedAbuseFilterLogEntry;
 import top.spco.spcobot.wiki.core.action.parameter.*;
-import top.spco.spcobot.wiki.core.exception.AlreadyBlockedException;
+import top.spco.spcobot.wiki.core.action.query.AllPagesListModule;
+import top.spco.spcobot.wiki.core.action.request.BlockRequest;
+import top.spco.spcobot.wiki.core.action.request.QueryRequest;
 import top.spco.spcobot.wiki.core.exception.InsufficientPermissionsException;
-import top.spco.spcobot.wiki.core.exception.NoSuchUserException;
 import top.spco.spcobot.wiki.core.user.*;
 import top.spco.spcobot.wiki.core.util.CollectionUtil;
 import top.spco.spcobot.wiki.core.util.JsonUtil;
@@ -50,10 +53,10 @@ import static top.spco.spcobot.wiki.core.util.MapUtil.paramsMap;
  * Wiki实例。
  *
  * @author SpCo
- * @version 0.1.2
+ * @version 1.0.1
  * @since 0.1.0
  */
-@SuppressWarnings({"unused"})
+@SuppressWarnings("unused")
 public final class Wiki implements UserAction {
     private final static Logger LOGGER = LogUtil.getLogger();
     private final OkHttpClient client;
@@ -65,9 +68,19 @@ public final class Wiki implements UserAction {
     private final HashMap<String, String> basicRequestParams = paramsMap("format", "json");
     private String csrfToken;
     private String patrolToken;
+    private String userRightToken;
+    private String watchToken;
+    private String accountCreateToken;
+    private String rollbackToken;
     private final Supplier<String> otpSupplier;
     private int normalApiLimit = 50;
     private int higherApiLimit = 500;
+
+    /*
+     * 重写Api调用方式：
+     * query等action参数支持同时查询多种不同参数，这样可以减少api调用次数，减少调用api所花费的时间
+     * 可以把每个不同query查询的请求看成不同的模块，
+     */
 
     Wiki(HttpUrl actionApi, CookieManager cookieManager, Proxy proxy, String username, String password, Assert loginAssert, Supplier<String> otpSupplier) {
         this.username = username;
@@ -132,11 +145,32 @@ public final class Wiki implements UserAction {
      * @return 返回一个 {@link Request.Builder} 对象，用于进一步构建请求
      * @since 0.1.0
      */
-    Request.Builder requestBase(Map<String, String> params) {
+    public Request.Builder requestBase(Map<String, String> params) {
         HttpUrl.Builder urlBuilder = actionApi.newBuilder();
         params.forEach(urlBuilder::addQueryParameter);
         basicRequestParams.forEach(urlBuilder::addQueryParameter);
         return new Request.Builder().url(urlBuilder.build());
+    }
+
+    /**
+     * 直接通过 {@link Request} 创建一次调用
+     *
+     * @param request 一次调用的请求
+     * @return 返回一个 {@link Call} 对象
+     * @since 1.0.1
+     */
+    public Call newCall(Request request) {
+        return client.newCall(request);
+    }
+
+    /**
+     * 获取Wiki API 的 URL 地址。
+     *
+     * @return 返回Wiki API 的 URL 地址
+     * @since 1.0.1
+     */
+    public HttpUrl getActionApi() {
+        return actionApi;
     }
 
     /**
@@ -148,6 +182,7 @@ public final class Wiki implements UserAction {
      * @throws IOException 如果请求过程中发生输入输出异常
      * @since 0.1.0
      */
+    @Deprecated
     public Response get(ActionTypes type, Map<String, String> additional) throws IOException {
         HashMap<String, String> params = new HashMap<>();
         if (type.needToken()) {
@@ -155,7 +190,7 @@ public final class Wiki implements UserAction {
         }
         params.putAll(type.getBaseParams());
         params.putAll(additional);
-        return client.newCall(requestBase(params).get().build()).execute();
+        return newCall(requestBase(params).get().build()).execute();
     }
 
     /**
@@ -166,6 +201,7 @@ public final class Wiki implements UserAction {
      * @throws IOException 如果请求过程中发生输入输出异常
      * @since 0.1.0
      */
+    @Deprecated
     public Response get(ActionTypes type) throws IOException {
         HashMap<String, String> params = new HashMap<>();
         if (type.needToken()) {
@@ -173,7 +209,7 @@ public final class Wiki implements UserAction {
         }
         params.putAll(type.getBaseParams());
 
-        return client.newCall(requestBase(params).get().build()).execute();
+        return newCall(requestBase(params).get().build()).execute();
     }
 
     /**
@@ -187,7 +223,7 @@ public final class Wiki implements UserAction {
      */
     public Response get(Map<String, String> params, Map<String, String> additional) throws IOException {
         params.putAll(additional);
-        return client.newCall(requestBase(params).get().build()).execute();
+        return newCall(requestBase(params).get().build()).execute();
     }
 
     /**
@@ -199,7 +235,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public Response get(Map<String, String> params) throws IOException {
-        return client.newCall(requestBase(params).get().build()).execute();
+        return newCall(requestBase(params).get().build()).execute();
     }
 
     /**
@@ -210,19 +246,50 @@ public final class Wiki implements UserAction {
      * @return 返回一个 {@link Response} 对象，表示服务器的响应
      * @throws IOException 如果请求过程中发生输入输出异常
      * @since 0.1.0
+     * @deprecated 请使用 {@link #post(ActionType, Map)}
      */
+    @Deprecated
     public Response post(ActionTypes type, Map<String, String> form) throws IOException {
         FormBody.Builder formBodyBuilder = new FormBody.Builder();
         form.forEach(formBodyBuilder::add);
         if (type.needToken()) {
-            if (type == ActionTypes.PATROL) {
-                formBodyBuilder.add("token", patrolToken);
-            } else {
-                formBodyBuilder.add("token", csrfToken);
+            switch (type.getTokenType()) {
+                case PATROL -> formBodyBuilder.add(type.getTokenParameterName(), patrolToken);
+                case CSRF -> formBodyBuilder.add(type.getTokenParameterName(), csrfToken);
+                case LOGIN -> formBodyBuilder.add(type.getTokenParameterName(), getLoginToken());
+                case USER_RIGHTS -> formBodyBuilder.add(type.getTokenParameterName(), userRightToken);
+                case WATCH -> formBodyBuilder.add(type.getTokenParameterName(), watchToken);
+                case ROLLBACK -> formBodyBuilder.add(type.getTokenParameterName(), rollbackToken);
+                case CREATE_ACCOUNT -> formBodyBuilder.add(type.getTokenParameterName(), accountCreateToken);
             }
         }
+        return newCall(requestBase(type.getBaseParams()).post(formBodyBuilder.build()).build()).execute();
+    }
 
-        return client.newCall(requestBase(type.getBaseParams()).post(formBodyBuilder.build()).build()).execute();
+    /**
+     * 执行 POST 请求。
+     *
+     * @param type 操作类型
+     * @param form 包含表单数据的映射表，其中键为表单字段名，值为表单字段值
+     * @return 返回一个 {@link Response} 对象，表示服务器的响应
+     * @throws IOException 如果请求过程中发生输入输出异常
+     * @since 1.0.1
+     */
+    public Response post(ActionType type, Map<String, String> form) throws IOException {
+        FormBody.Builder formBodyBuilder = new FormBody.Builder();
+        form.forEach(formBodyBuilder::add);
+        if (type.needToken()) {
+            switch (type.getTokenType()) {
+                case PATROL -> formBodyBuilder.add(type.getTokenParameterName(), patrolToken);
+                case CSRF -> formBodyBuilder.add(type.getTokenParameterName(), csrfToken);
+                case LOGIN -> formBodyBuilder.add(type.getTokenParameterName(), getLoginToken());
+                case USER_RIGHTS -> formBodyBuilder.add(type.getTokenParameterName(), userRightToken);
+                case WATCH -> formBodyBuilder.add(type.getTokenParameterName(), watchToken);
+                case ROLLBACK -> formBodyBuilder.add(type.getTokenParameterName(), rollbackToken);
+                case CREATE_ACCOUNT -> formBodyBuilder.add(type.getTokenParameterName(), accountCreateToken);
+            }
+        }
+        return newCall(requestBase(type.getBaseParams()).post(formBodyBuilder.build()).build()).execute();
     }
 
     /**
@@ -238,7 +305,7 @@ public final class Wiki implements UserAction {
         FormBody.Builder formBodyBuilder = new FormBody.Builder();
         form.forEach(formBodyBuilder::add);
 
-        return client.newCall(requestBase(params).post(formBodyBuilder.build()).build()).execute();
+        return newCall(requestBase(params).post(formBodyBuilder.build()).build()).execute();
     }
 
     /**
@@ -250,8 +317,8 @@ public final class Wiki implements UserAction {
      * @param bodyHandler 处理返回体的函数
      * @since 0.1.0
      */
+    @Deprecated
     public void continuableAction(ActionTypes type, Map<String, String> baseParams, String action, Consumer<JsonObject> bodyHandler) {
-        int i = 0;
         boolean continuable = false;
         Map<String, String> continueParam = new HashMap<>();
         do {
@@ -289,6 +356,10 @@ public final class Wiki implements UserAction {
         }
         csrfToken = getCSRFToken();
         patrolToken = getPatrolToken();
+        watchToken = getToken(TokenType.WATCH);
+        userRightToken = getToken(TokenType.USER_RIGHTS);
+        rollbackToken = getToken(TokenType.ROLLBACK);
+        accountCreateToken = getToken(TokenType.CREATE_ACCOUNT);
     }
 
     /**
@@ -308,14 +379,54 @@ public final class Wiki implements UserAction {
         return responseBody.string();
     }
 
-    private String getToken(ActionTypes actionTypes, String key) throws IOException {
-        try (Response response = get(actionTypes.getBaseParams())) {
+    /**
+     * 获取令牌
+     *
+     * @param tokenType 令牌种类
+     * @return 令牌
+     * @since 1.0.1
+     */
+    public String getToken(TokenType tokenType) throws IOException {
+        try (Response response = get(paramsMap("action", "query", "meta", "tokens", "type", tokenType.toString()))) {
             String body = checkAndGetBody(response, "obtain toke");
-            String token = JsonUtil.checkAndGetAsString(body, true, "query", "tokens", key);
+            String token = JsonUtil.checkAndGetAsString(body, true, "query", "tokens", tokenType + "token");
             if (token == null) {
                 throw new RuntimeException("Failed to obtain token");
             }
             return token;
+        }
+    }
+
+    /**
+     * 获取令牌中的缓存。
+     *
+     * @param tokenType 令牌种类
+     * @return 缓存中的令牌。当令牌种类为 {@link TokenType#LOGIN} 时始终返回 {@code null} ，因为该令牌不会被缓存
+     * @since 1.0.1
+     */
+    public String getTokenCache(TokenType tokenType) {
+        switch (tokenType) {
+            case PATROL -> {
+                return patrolToken;
+            }
+            case CSRF -> {
+                return csrfToken;
+            }
+            case USER_RIGHTS -> {
+                return userRightToken;
+            }
+            case WATCH -> {
+                return watchToken;
+            }
+            case ROLLBACK -> {
+                return rollbackToken;
+            }
+            case CREATE_ACCOUNT -> {
+                return accountCreateToken;
+            }
+            default -> {
+                return null;
+            }
         }
     }
 
@@ -344,7 +455,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public String getLoginToken() throws IOException {
-        return getToken(ActionTypes.TOKENS_LOGIN, "logintoken");
+        return getToken(TokenType.LOGIN);
     }
 
     /**
@@ -354,7 +465,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public String getCSRFToken() throws IOException {
-        return getToken(ActionTypes.TOKENS_CSRF, "csrftoken");
+        return getToken(TokenType.CSRF);
     }
 
     /**
@@ -364,7 +475,7 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public String getPatrolToken() throws IOException {
-        return getToken(ActionTypes.TOKENS_PATROL, "patroltoken");
+        return getToken(TokenType.PATROL);
     }
 
     /**
@@ -407,6 +518,7 @@ public final class Wiki implements UserAction {
      * @param condition     检查权限的条件
      * @param requiredRight 所需要的权限
      * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @see PermissionChecker
      * @since 0.1.1
      */
     public void checkPermission(Set<String> rights, String action, boolean condition, UserRight... requiredRight) {
@@ -422,6 +534,7 @@ public final class Wiki implements UserAction {
      * @param allNeeded     是否需要所有权限，为 {@code false} 时只需其中一项
      * @param requiredRight 所需要的权限
      * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @see PermissionChecker
      * @since 0.1.1
      */
     public void checkPermission(Set<String> rights, String action, boolean condition, boolean allNeeded, UserRight... requiredRight) {
@@ -449,6 +562,7 @@ public final class Wiki implements UserAction {
      * @param allNeeded     是否需要所有权限，为 {@code false} 时只需其中一项
      * @param requiredRight 所需要的权限
      * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @see PermissionChecker
      * @since 0.1.1
      */
     public void checkPermission(String action, boolean condition, boolean allNeeded, UserRight... requiredRight) {
@@ -463,6 +577,7 @@ public final class Wiki implements UserAction {
      * @param condition     检查权限的条件
      * @param requiredRight 所需要的权限
      * @throws InsufficientPermissionsException 缺少权限时抛出
+     * @see PermissionChecker
      * @since 0.1.1
      */
     public void checkPermission(String action, boolean condition, UserRight... requiredRight) {
@@ -496,7 +611,7 @@ public final class Wiki implements UserAction {
     }
 
     private void login(String username, String password) throws IOException {
-        try (Response response = post(ActionTypes.LOGIN, paramsMap("lgname", username, "lgpassword", password, "lgtoken", getLoginToken()))) {
+        try (Response response = post(ActionType.LOGIN, paramsMap("lgname", username, "lgpassword", password))) {
             String body = checkAndGetBody(response, "login");
             String result = JsonUtil.checkAndGetNonNullString(body, "login", "result");
             switch (result) {
@@ -513,7 +628,7 @@ public final class Wiki implements UserAction {
     }
 
     private void clientLogin(String username, String password) throws IOException {
-        try (Response response = post(ActionTypes.CLIENT_LOGIN, paramsMap("username", username, "password", password, "logintoken", getLoginToken(), "loginreturnurl", "https://example.com"))) {
+        try (Response response = post(ActionType.CLIENT_LOGIN, paramsMap("username", username, "password", password, "loginreturnurl", "https://example.com"))) {
             String body = checkAndGetBody(response, "login");
             String status = JsonUtil.checkAndGetNonNullString(body, "clientlogin", "status");
             String message = JsonUtil.checkAndGetNonNullString(body, "clientlogin", "message");
@@ -541,7 +656,7 @@ public final class Wiki implements UserAction {
                                 tfaCode = scanner.nextLine();
                             }
                         }
-                        try (Response tfaResponse = post(ActionTypes.CLIENT_LOGIN, paramsMap("logintoken", getLoginToken(), "OATHToken", tfaCode, "logincontinue", "true"))) {
+                        try (Response tfaResponse = post(ActionType.CLIENT_LOGIN, paramsMap("OATHToken", tfaCode, "logincontinue", "true"))) {
                             String tfaBody = checkAndGetBody(tfaResponse, "client-login");
                             String tfaStatus = JsonUtil.checkAndGetNonNullString(tfaBody, "clientlogin", "status");
                             if (tfaStatus.equals("PASS")) {
@@ -569,7 +684,7 @@ public final class Wiki implements UserAction {
         } else {
             paramsMap.put("revid", revisionId + "");
         }
-        try (Response response = post(ActionTypes.PATROL, paramsMap)) {
+        try (Response response = post(ActionType.PATROL, paramsMap)) {
             String body = checkAndGetBody(response, "patrol");
             return GSON.fromJson(body, JsonObject.class).has("patrol");
         } catch (Exception e) {
@@ -640,60 +755,38 @@ public final class Wiki implements UserAction {
     public void block(String user, Expiry expiry, String reason, boolean annoOnly, boolean noCreate,
                       boolean allowUserTalk, boolean reblock,
                       boolean watchUser, boolean partial, String[] pageRestrictions, NameSpace... nameSpacesRestrictions) {
-        Set<String> rights = getRightsName();
-        checkPermission(rights, "block user", true, UserRight.BLOCK);
-        Map<String, String> params = paramsMap("user", user, "expiry", expiry.toString());
+        BlockRequest request = new BlockRequest(user, expiry, this);
         if (reason != null && !reason.isEmpty()) {
-            params.put("reason", reason);
+            request.reason(reason);
         }
         if (annoOnly) {
-            params.put("anononly", "true");
+            request.anonOnly();
         }
         if (noCreate) {
-            params.put("nocreate", "true");
+            request.noCreate();
         }
         if (allowUserTalk) {
-            params.put("allowusertalk", "true");
+            request.allowUserTalk();
         }
         if (reblock) {
-            params.put("reblock", "true");
+            request.reblock();
         }
         if (watchUser) {
-            params.put("watchuser", "true");
+            request.watchUser();
         }
         if (partial) {
-            params.put("partial", "true");
             if ((pageRestrictions == null || pageRestrictions.length == 0) && (nameSpacesRestrictions == null || nameSpacesRestrictions.length == 0)) {
-                params.put("namespacerestrictions", "*");
+                request.nameSpaceRestriction(NameSpace.ALL);
             } else {
                 if (!(pageRestrictions == null || pageRestrictions.length == 0)) {
-                    if (pageRestrictions.length > 10) {
-                        throw new IllegalArgumentException("Page restrictions should not exceed 10");
-                    }
-                    params.put("pagerestrictions", String.join("|", pageRestrictions));
+                    request.pageRestriction(pageRestrictions);
                 }
                 if (!(nameSpacesRestrictions == null || nameSpacesRestrictions.length == 0)) {
-                    params.put("namespacerestrictions", NameSpace.toApiParam(true, nameSpacesRestrictions));
+                    request.nameSpaceRestriction(nameSpacesRestrictions);
                 }
             }
         }
-        try (Response response = post(ActionTypes.BLOCK, params)) {
-            String body = checkAndGetBody(response, "block user");
-            LOGGER.info(body);
-            JsonElement errorJson = JsonUtil.checkAndGetElement(body, "error");
-            if (errorJson != null) {
-                String errorCode = JsonUtil.checkAndGetNonNullElement(errorJson.getAsJsonObject(), "code").getAsString();
-                String errorInfo = JsonUtil.checkAndGetNonNullElement(errorJson.getAsJsonObject(), "info").getAsString();
-                switch (errorCode) {
-                    case "nosuchsuer" -> throw new NoSuchUserException(user);
-                    case "alreadyblocked" -> throw new AlreadyBlockedException(user);
-                    case "missingtitle", "ipb-prevent-user-talk-edit" -> throw new IllegalArgumentException(errorInfo);
-                    default -> throw new RuntimeException(errorCode + ": " + errorInfo);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to block user: " + e.getMessage(), e);
-        }
+        request.execute().parse();
     }
 
     /**
@@ -714,7 +807,7 @@ public final class Wiki implements UserAction {
         if (watchUser) {
             params.put("watchuser", "true");
         }
-        try (Response response = post(ActionTypes.UNBLOCK, params)) {
+        try (Response response = post(ActionType.UNBLOCK, params)) {
             String body = checkAndGetBody(response, "unblock user");
             JsonElement errorJson = JsonUtil.checkAndGetElement(body, "error");
             if (errorJson != null) {
@@ -765,7 +858,7 @@ public final class Wiki implements UserAction {
         if (diffType != null) {
             params.put("difftype", diffType.toString());
         }
-        try (Response response = post(ActionTypes.COMPARE, params)) {
+        try (Response response = post(ActionType.COMPARE, params)) {
             String body = checkAndGetBody(response, "compare pages");
             return DifferentComparison.fromJson(JsonUtil.checkAndGetNonNullElement(body, "compare").getAsJsonObject());
         } catch (Exception e) {
@@ -843,7 +936,7 @@ public final class Wiki implements UserAction {
         if (loginAssert == Assert.BOT) {
             paramsMap.put("bot", "true");
         }
-        try (Response response = post(ActionTypes.EDIT, paramsMap)) {
+        try (Response response = post(ActionType.EDIT, paramsMap)) {
             String body = checkAndGetBody(response, "edit");
             String errorCode = JsonUtil.checkAndGetAsString(body, "error", "code");
             String errorInfo = JsonUtil.checkAndGetAsString(body, "error", "info");
@@ -851,7 +944,8 @@ public final class Wiki implements UserAction {
                 switch (errorCode) {
                     case "abusefilter-disallowed" -> {
                         AbuseFilter abuseFilter = AbuseFilter.fromJson(JsonUtil.checkAndGetNonNullString(body, "error", "abusefilter"));
-                        throw new RuntimeException("Failed to edit: Triggered AbuseFilter#" + abuseFilter.id() + ". " + "Actions taken: " + Arrays.toString(abuseFilter.actions()) + ", description: " + abuseFilter.description());
+                        throw new RuntimeException("Failed to edit: Triggered AbuseFilter#" + abuseFilter.id() + ". " + "Actions taken: " +
+                                Arrays.toString(abuseFilter.actions()) + ", description: " + abuseFilter.description());
                     }
                     case "protectedpage" ->
                             throw new RuntimeException("Failed to edit: This page has been protected to prevent editing or other actions");
@@ -947,16 +1041,16 @@ public final class Wiki implements UserAction {
     /**
      * 循序列举在指定多个命名空间中的所有页面。
      *
-     * @param pagePrefix 搜索所有以此值开头的页面标题，为 {@code null} 时忽略
-     * @param filterDir  要列出哪些页面，为 {@code null} 时为 {@link FilterDir#ALL}
-     * @param nameSpaces 要列举的多个命名空间
+     * @param pagePrefix     搜索所有以此值开头的页面标题，为 {@code null} 时忽略
+     * @param filterRedirect 要列出哪些页面，为 {@code null} 时为 {@link FilterRedirect#ALL}
+     * @param nameSpaces     要列举的多个命名空间
      * @return 指定多个命名空间中的所有页面
      * @since 0.1.0
      */
-    public HashSet<Page> allPages(String pagePrefix, FilterDir filterDir, NameSpace... nameSpaces) {
+    public HashSet<Page> allPages(String pagePrefix, FilterRedirect filterRedirect, NameSpace... nameSpaces) {
         HashSet<Page> pages = new HashSet<>();
         for (NameSpace nameSpace : nameSpaces) {
-            pages.addAll(allPages(pagePrefix, filterDir, nameSpace));
+            pages.addAll(allPages(pagePrefix, filterRedirect, nameSpace));
         }
         return pages;
     }
@@ -964,16 +1058,16 @@ public final class Wiki implements UserAction {
     /**
      * 循序列举在指定多个命名空间中的所有页面标题。
      *
-     * @param pagePrefix 搜索所有以此值开头的页面标题，为 {@code null} 时忽略
-     * @param filterDir  要列出哪些页面，为 {@code null} 时为 {@link FilterDir#ALL}
-     * @param nameSpaces 要列举的多个命名空间
+     * @param pagePrefix     搜索所有以此值开头的页面标题，为 {@code null} 时忽略
+     * @param filterRedirect 要列出哪些页面，为 {@code null} 时为 {@link FilterRedirect#ALL}
+     * @param nameSpaces     要列举的多个命名空间
      * @return 指定多个命名空间中的所有页面标题
      * @since 0.1.0
      */
-    public HashSet<String> allPageTitles(String pagePrefix, FilterDir filterDir, NameSpace... nameSpaces) {
+    public HashSet<String> allPageTitles(String pagePrefix, FilterRedirect filterRedirect, NameSpace... nameSpaces) {
         HashSet<String> pages = new HashSet<>();
         for (NameSpace nameSpace : nameSpaces) {
-            for (Page page : allPages(pagePrefix, filterDir, nameSpace)) {
+            for (Page page : allPages(pagePrefix, filterRedirect, nameSpace)) {
                 pages.add(page.title());
             }
         }
@@ -983,28 +1077,27 @@ public final class Wiki implements UserAction {
     /**
      * 循序列举在指定命名空间中的所有页面。
      *
-     * @param pagePrefix 搜索所有以此值开头的页面标题，为 {@code null} 时忽略
-     * @param filterDir  要列出哪些页面，为 {@code null} 时为 {@link FilterDir#ALL}
-     * @param nameSpace  要列举的命名空间
+     * @param pagePrefix     搜索所有以此值开头的页面标题，为 {@code null} 时忽略
+     * @param filterRedirect 要列出哪些页面，为 {@code null} 时为 {@link FilterRedirect#ALL}
+     * @param nameSpace      要列举的命名空间
      * @return 指定命名空间中的所有页面
      * @since 0.1.0
      */
-    public HashSet<Page> allPages(String pagePrefix, FilterDir filterDir, NameSpace nameSpace) {
-        HashSet<Page> pages = new HashSet<>();
-        Map<String, String> baseParams = paramsMap("apnamespace", nameSpace.value, "aplimit", "max");
+    public HashSet<Page> allPages(String pagePrefix, FilterRedirect filterRedirect, NameSpace nameSpace) {
+        QueryRequest queryRequest = new QueryRequest(this, "list all pages");
+        AllPagesListModule allPages = new AllPagesListModule(queryRequest);
         if (pagePrefix != null) {
-            baseParams.put("apprefix", pagePrefix);
+            allPages.prefix(pagePrefix);
         }
-        if (filterDir != null) {
-            baseParams.put("apfilterredir", filterDir.value);
+        if (filterRedirect != null) {
+            allPages.filterRedirect(filterRedirect);
         }
-        continuableAction(ActionTypes.ALL_PAGES, baseParams, "list all pages", (jsonObject) -> {
-            JsonArray pagesJson = JsonUtil.checkAndGetElement(jsonObject, "query", "allpages").getAsJsonArray();
-            for (JsonElement page : pagesJson) {
-                pages.add(Page.fromJson(this, page.getAsJsonObject()));
-            }
-        });
-        return pages;
+        if (nameSpace != null) {
+            allPages.nameSpace(nameSpace);
+        }
+        queryRequest.addSubmodule(allPages);
+        queryRequest.execute().parse();
+        return allPages.getResult();
     }
 
     /**
@@ -1160,18 +1253,18 @@ public final class Wiki implements UserAction {
     /**
      * 查找所有链接至指定页面的页面。
      *
-     * @param pageTitle  链接被指定的页面的标题
-     * @param filterDir  是否包含重定向
-     * @param nameSpaces 只包括这些命名空间的页面，此参数支持使用 {@link NameSpace#ALL} 表示指定所有命名空间
+     * @param pageTitle      链接被指定的页面的标题
+     * @param filterRedirect 是否包含重定向
+     * @param nameSpaces     只包括这些命名空间的页面，此参数支持使用 {@link NameSpace#ALL} 表示指定所有命名空间
      * @return 所有链接至指定页面的页面
      * @since 0.1.0
      */
-    public HashSet<String> linksHere(String pageTitle, FilterDir filterDir, NameSpace... nameSpaces) {
+    public HashSet<String> linksHere(String pageTitle, FilterRedirect filterRedirect, NameSpace... nameSpaces) {
         HashSet<String> pages = new HashSet<>();
         Map<String, String> baseParam = paramsMap("lhlimit", "max", "titles", pageTitle, "lhprop", "title|pageid");
-        if (filterDir == FilterDir.NON_REDIRECTS) {
+        if (filterRedirect == FilterRedirect.NON_REDIRECTS) {
             baseParam.put("lhshow", "!redirect");
-        } else if (filterDir == FilterDir.REDIRECTS) {
+        } else if (filterRedirect == FilterRedirect.REDIRECTS) {
             baseParam.put("lhshow", "redirect");
         }
         if (nameSpaces != null && nameSpaces.length != 0) {

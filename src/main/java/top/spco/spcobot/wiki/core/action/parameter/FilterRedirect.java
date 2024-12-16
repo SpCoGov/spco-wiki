@@ -8,13 +8,13 @@ import top.spco.spcobot.wiki.core.Wiki;
  *
  * @author SpCo
  * @version 0.1.0
- * @see Wiki#allPages(String, FilterDir, NameSpace)
- * @see Wiki#allPages(String, FilterDir, NameSpace...)
- * @see Wiki#allPageTitles(String, FilterDir, NameSpace...)
- * @see Wiki#linksHere(String, FilterDir, NameSpace...)
+ * @see Wiki#allPages(String, FilterRedirect, NameSpace)
+ * @see Wiki#allPages(String, FilterRedirect, NameSpace...)
+ * @see Wiki#allPageTitles(String, FilterRedirect, NameSpace...)
+ * @see Wiki#linksHere(String, FilterRedirect, NameSpace...)
  * @since 0.1.0
  */
-public enum FilterDir {
+public enum FilterRedirect {
     /**
      * 获取所有页面，包括重定向和非重定向页面。
      */
@@ -29,7 +29,12 @@ public enum FilterDir {
     REDIRECTS("redirects");
     public final String value;
 
-    FilterDir(String value) {
+    FilterRedirect(String value) {
         this.value = value;
+    }
+
+    @Override
+    public String toString() {
+        return value;
     }
 }

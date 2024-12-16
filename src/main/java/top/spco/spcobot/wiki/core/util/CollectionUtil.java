@@ -1,13 +1,12 @@
 package top.spco.spcobot.wiki.core.util;
 
-import com.google.common.collect.ImmutableList;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 import java.util.*;
 
 /**
  * @author SpCo
- * @version 0.1.0
+ * @version 1.0.1
  * @since 0.1.0
  */
 public class CollectionUtil {
@@ -76,5 +75,30 @@ public class CollectionUtil {
         ArrayList<E> list = new ArrayList<>(capacity);
         Collections.addAll(list, elements);
         return list;
+    }
+
+    /**
+     * 将字符串列表转换为自然语言形式的字符串。
+     * <p>
+     * 例如：
+     * <ul>
+     *     <li>对于 ["apple"] 返回 "apple"</li>
+     *     <li>对于 ["apple", "banana"] 返回 "apple and banana"</li>
+     *     <li>对于 ["apple", "banana", "cherry"] 返回 "apple, banana and cherry"</li>
+     * </ul>
+     *
+     * @param list 字符串列表
+     * @return 转换后的自然语言形式的字符串。如果列表为 {@code null} 或为空，返回空字符串 {@code ""}
+     * @since 1.0.1
+     */
+    public static String toNaturalString(List<String> list) {
+        if (list == null || list.isEmpty()) {
+            return "";
+        }
+        if (list.size() == 1) {
+            return list.getFirst();
+        }
+        return String.join(", ", list.subList(0, list.size() - 1)) +
+                " and " + list.getLast();
     }
 }
