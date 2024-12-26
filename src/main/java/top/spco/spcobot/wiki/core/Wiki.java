@@ -30,6 +30,7 @@ import top.spco.spcobot.wiki.core.action.parameter.*;
 import top.spco.spcobot.wiki.core.action.query.AllPagesListModule;
 import top.spco.spcobot.wiki.core.action.request.BlockRequest;
 import top.spco.spcobot.wiki.core.action.request.QueryRequest;
+import top.spco.spcobot.wiki.core.action.request.UnblockRequest;
 import top.spco.spcobot.wiki.core.exception.InsufficientPermissionsException;
 import top.spco.spcobot.wiki.core.user.*;
 import top.spco.spcobot.wiki.core.util.CollectionUtil;
@@ -798,30 +799,14 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public void unblock(String user, String reason, boolean watchUser) {
-        Set<String> rights = getRightsName();
-        checkPermission(rights, "unblock user", true, UserRight.BLOCK);
-        Map<String, String> params = paramsMap("user", user);
+        UnblockRequest request = new UnblockRequest(user, this);
         if (reason != null && !reason.isEmpty()) {
-            params.put("reason", reason);
+            request.reason(reason);
         }
         if (watchUser) {
-            params.put("watchuser", "true");
+            request.watchUser();
         }
-        try (Response response = post(ActionType.UNBLOCK, params)) {
-            String body = checkAndGetBody(response, "unblock user");
-            JsonElement errorJson = JsonUtil.checkAndGetElement(body, "error");
-            if (errorJson != null) {
-                String errorCode = JsonUtil.checkAndGetNonNullElement(errorJson.getAsJsonObject(), "code").getAsString();
-                String errorInfo = JsonUtil.checkAndGetNonNullElement(errorJson.getAsJsonObject(), "info").getAsString();
-                switch (errorCode) {
-                    case "cantunblock" -> throw new IllegalStateException("'" + user + "'" + " is not blocked.");
-                    case "blockedasrange" -> throw new IllegalStateException(errorInfo);
-                    default -> throw new RuntimeException(errorCode + ": " + errorInfo);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to unblock user: " + e.getMessage(), e);
-        }
+        request.execute().parse();
     }
 
     /**

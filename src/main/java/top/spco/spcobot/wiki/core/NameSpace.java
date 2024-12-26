@@ -328,6 +328,12 @@ public final class NameSpace {
         return value + "";
     }
 
+    /**
+     * TODO: Remove in 2.0
+     *
+     * @deprecated
+     */
+    @Deprecated
     public static NameSpace[] allNameSpaces() {
         return mapping.values().toArray(new NameSpace[0]);
     }
