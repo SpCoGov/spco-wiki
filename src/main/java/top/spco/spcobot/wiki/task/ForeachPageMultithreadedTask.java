@@ -15,9 +15,9 @@
  */
 package top.spco.spcobot.wiki.task;
 
-import top.spco.spcobot.wiki.core.NameSpace;
-import top.spco.spcobot.wiki.core.Page;
-import top.spco.spcobot.wiki.core.action.parameter.FilterRedirect;
+import top.spco.spcobot.wiki.NameSpace;
+import top.spco.spcobot.wiki.Page;
+import top.spco.spcobot.wiki.action.parameter.FilterRedirect;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -13,40 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package top.spco.spcobot.wiki.task;
-
-import top.spco.spcobot.wiki.Wiki;
-
-import java.util.ArrayList;
-import java.util.List;
+package top.spco.spcobot.wiki.action.parameter;
 
 /**
- * 用于管理机器人的操作任务。
- *
  * @author SpCo
  * @version 0.1.0
  * @since 0.1.0
  */
-public class TaskManager {
-    private final Wiki wiki;
-    private final List<Task<?>> tasks = new ArrayList<>();
+public enum Assert {
+    /**
+     * 验证用户未登录。
+     */
+    ANON("anon"),
+    /**
+     * 验证是否有机器人用户权限。
+     */
+    BOT("bot"),
+    /**
+     * 验证用户已登录。
+     */
+    USER("user");
+    private final String value;
 
-    public TaskManager(Wiki wiki) {
-        this.wiki = wiki;
+    Assert(String value) {
+        this.value = value;
     }
 
-    public void addTask(Task<?> task) {
-        tasks.add(task);
-    }
-
-    public void run() {
-        for (Task<?> task : tasks) {
-            task.setWiki(wiki);
-            task.run();
-        }
-    }
-
-    public Wiki getWiki() {
-        return wiki;
+    public String getValue() {
+        return value;
     }
 }

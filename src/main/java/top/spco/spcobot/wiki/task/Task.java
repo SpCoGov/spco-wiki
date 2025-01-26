@@ -16,7 +16,7 @@
 package top.spco.spcobot.wiki.task;
 
 
-import top.spco.spcobot.wiki.core.Wiki;
+import top.spco.spcobot.wiki.Wiki;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
