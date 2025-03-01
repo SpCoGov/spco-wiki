@@ -306,7 +306,7 @@ public final class NameSpace {
      */
     public final int value;
 
-    private NameSpace(int value) {
+    public NameSpace(int value) {
         this.value = value;
         if (value >= 0) {
             mapping.put(value, this);

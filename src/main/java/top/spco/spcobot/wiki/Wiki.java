@@ -27,7 +27,9 @@ import top.spco.spcobot.wiki.action.filter.AbuseFilter;
 import top.spco.spcobot.wiki.action.filter.AbuseFilterLogEntry;
 import top.spco.spcobot.wiki.action.filter.SimplifiedAbuseFilterLogEntry;
 import top.spco.spcobot.wiki.action.parameter.*;
+import top.spco.spcobot.wiki.action.query.AbuseFiltersListModule;
 import top.spco.spcobot.wiki.action.query.AllPagesListModule;
+import top.spco.spcobot.wiki.action.query.AllUsersListModule;
 import top.spco.spcobot.wiki.action.request.BlockRequest;
 import top.spco.spcobot.wiki.action.request.QueryRequest;
 import top.spco.spcobot.wiki.action.request.UnblockRequest;
@@ -883,26 +885,16 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public HashMap<Integer, AbuseFilter> allAbuseFilters(Integer startId, Integer endId) {
-        HashMap<Integer, AbuseFilter> filters = new HashMap<>();
-        Map<String, String> baseParams = paramsMap("abflimit", "max", "abfprop", "actions|comments|description|id|pattern|private|status");
+        QueryRequest queryRequest = new QueryRequest(this, "list all abuse filters");
+        AbuseFiltersListModule abuseFilters = new AbuseFiltersListModule(queryRequest);
         if (startId != null) {
-            baseParams.put("abfstartid", startId.toString());
+            abuseFilters.startId(startId);
         }
         if (endId != null) {
-            baseParams.put("abfendid", endId.toString());
+            abuseFilters.endId(endId);
         }
-        try (Response response = get(ActionTypes.ABUSE_FILTERS, baseParams)) {
-            String body = checkAndGetBody(response, "fetch all abuse filters");
-            JsonArray array = JsonUtil.checkAndGetNonNullElement(body, "query", "abusefilters").getAsJsonArray();
-            for (JsonElement arrayElement : array) {
-                JsonObject jsonObject = arrayElement.getAsJsonObject();
-                AbuseFilter filter = AbuseFilter.fromJson(jsonObject);
-                filters.put(filter.id(), filter);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch all abuse filters: " + e.getMessage(), e);
-        }
-        return filters;
+        queryRequest.addSubmodule(abuseFilters);
+        return abuseFilters.getResult();
     }
 
     private boolean edit(String title, int pageId, String text, String summary, boolean isMinor, boolean createOnly) {
@@ -1094,28 +1086,15 @@ public final class Wiki implements UserAction {
      * @since 0.1.0
      */
     public UserSet allUsers(boolean editedOnly, UserGroup... groups) {
-        UserSet users = new UserSet(this);
-        Map<String, String> baseParam = paramsMap("aulimit", "max");
-        if (groups.length > 0) {
-            StringBuilder augroup = new StringBuilder();
-            for (int i = 0; i < groups.length; i++) {
-                augroup.append(groups[i].value);
-                if (i != groups.length - 1) {
-                    augroup.append("|");
-                }
-            }
-            baseParam.put("augroup", augroup.toString());
-        }
+        QueryRequest queryRequest = new QueryRequest(this, "list all users");
+        AllUsersListModule allUsers = new AllUsersListModule(queryRequest);
         if (editedOnly) {
-            baseParam.put("auwitheditsonly", "true");
+            allUsers.withEditsOnly();
         }
-        continuableAction(ActionTypes.ALL_USERS, baseParam, "get all users", jsonObject -> {
-            JsonArray usersJson = JsonUtil.checkAndGetNonNullElement(jsonObject, "query", "allusers").getAsJsonArray();
-            for (JsonElement user : usersJson) {
-                users.add(User.fromJson(this, user.getAsJsonObject()));
-            }
-        });
-        return users;
+        allUsers.groups(groups);
+        queryRequest.addSubmodule(allUsers);
+        queryRequest.execute().parse();
+        return allUsers.getResult();
     }
 
     /**

@@ -1,6 +1,6 @@
 package top.spco.spcobot.wiki.action.query;
 
-import top.spco.spcobot.wiki.QuerySubmodule;
+import top.spco.spcobot.wiki.action.request.QuerySubmodule;
 import top.spco.spcobot.wiki.action.request.QueryRequest;
 
 public abstract class QueryMetaModule<T> extends QuerySubmodule<T> {

@@ -3,7 +3,6 @@ package top.spco.spcobot.wiki.action.request;
 import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 import top.spco.spcobot.wiki.ActionResponse;
-import top.spco.spcobot.wiki.QuerySubmodule;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;

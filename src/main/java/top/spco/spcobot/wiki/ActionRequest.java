@@ -132,7 +132,9 @@ public abstract class ActionRequest<T extends ActionResponse<?, ?>> {
      * @since 1.0.1
      */
     public ActionRequest<T> addQueryParameter(String key, String value) {
-        queryParams.put(key, value);
+        if (value != null && !value.isEmpty()) {
+            queryParams.put(key, value);
+        }
         return this;
     }
 
@@ -148,7 +150,9 @@ public abstract class ActionRequest<T extends ActionResponse<?, ?>> {
      * @since 1.0.1
      */
     public ActionRequest<T> addFormParameter(String key, String value) {
-        formParams.put(key, value);
+        if (value != null && !value.isEmpty()) {
+            formParams.put(key, value);
+        }
         return this;
     }
 

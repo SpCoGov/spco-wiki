@@ -4,7 +4,6 @@ import com.google.gson.JsonObject;
 import okhttp3.Call;
 import okhttp3.Response;
 import top.spco.spcobot.wiki.ActionRequest;
-import top.spco.spcobot.wiki.QuerySubmodule;
 import top.spco.spcobot.wiki.RequestMethod;
 import top.spco.spcobot.wiki.Wiki;
 import top.spco.spcobot.wiki.action.ActionType;
@@ -105,6 +104,7 @@ public class QueryRequest extends ActionRequest<QueryResponse> {
                     continueParam = MapUtil.jsonToMap(continueJson);
                 }
                 for (QuerySubmodule<?> submodule : submodules) {
+                    submodule.parsingPhase = true;
                     submodule.parse(response);
                 }
             } catch (Exception e) {
